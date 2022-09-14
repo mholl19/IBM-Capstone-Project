@@ -10,11 +10,13 @@ shinyUI(
             sidebarLayout(
               # Create a main panel to show cities on a leaflet map
               mainPanel(
-                leaflet(elementId = 'city_bike_map', height = 600, width = 600)
+                leafletOutput('city_bike_map', height = 600, width = 800)
             
               ),
               # Create a side bar to show detailed plots for a city
               sidebarPanel(
+                selectInput(inputId = "city_dropdown", "Select City: ",
+                            c("All", "Seoul", "Suzhou", "London", "New York", "Paris"))
                 # select drop down list to select city
               ))
   ))
