@@ -66,6 +66,35 @@ shinyServer(function(input, output){
                            color = ~color_levels(filteredcity$BIKE_PREDICTION_LEVEL))
           
       })
+      #filter temp data for selected city
+      sel_city_weather_bike_df <- city_weather_bike_df %>%
+        filter(CITY_ASCII == input$city_dropdown)
+      #temperature plot
+      output$temp_line <- renderPlot ({
+        temp_line_plot <- ggplot(sel_city_weather_bike_df, aes(x=1:length(TEMPERATURE), y=TEMPERATURE)) +
+          geom_line(color = "yellow", size = 1) +
+          labs(x = "Time (3 Hours Ahead)", y = "Temperature (C)") +
+          geom_point() +
+          geom_text(aes(label = paste(TEMPERATURE, "C")), hjust = 0, vjust = 0) +
+          ggtitle("Temperature Trends")
+        temp_line_plot
+          
+      })
+      #bike prediction plot
+      output$bike_line <- renderPlot ({
+        bike_line_plot <- ggplot(sel_city_weather_bike_df, aes(x=1:length(BIKE_PREDICTION), y=BIKE_PREDICTION)) +
+          geom_line(color = "green", size = 1, linetype = "dashed") +
+          labs(x = "Time (3 hours ahead)", y= "Predicted Bike Count") +
+          geom_point() +
+          geom_text(aes(label = paste(BIKE_PREDICTION)), hjust = 0, vjust = 0) +
+          ggtitle("Bike Prediction Trend")
+        bike_line_plot
+      })
+      #text output of bike count point START HERE
+      output$bike_date_output <- renderText({
+        paste0("Time: ", as.POSIXct(as.integer(input$plot_click$x), origin = "1970-01-01"),
+               "\nBike Count Prediction: ", as.integer(input$plot_click$y))
+      })
     } 
   })
 })
