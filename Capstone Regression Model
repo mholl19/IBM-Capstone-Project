@@ -1,3 +1,8 @@
+library("rlang")
+library("tidymodels")
+library("tidyverse")
+library("stringr")
+
 #dataset url
 dataset_url <- "https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-RP0321EN-SkillsNetwork/labs/datasets/seoul_bike_sharing_converted_normalized.csv"
 bike_sharing_df <- read_csv(dataset_url)
@@ -155,7 +160,7 @@ model_four_rsq <- rsq(model_four, truth = truth, estimate = .pred)
 
 #create dataframe
 model <- c(rep("Base Model", 2), rep("Model 2", 2), rep("Model 3", 2), rep("Model 4", 2), rep("Best Model", 2))
-stat <- rep(c("RMSE" , "RSQ") , 5)
+stat <- rep(c("RSQ" , "RMSE") , 5)
 value <- c(base_rsq$.estimate, base_rmse$.estimate, model_two_rsq$.estimate, model_two_rmse$.estimate, model_three_rsq$.estimate,
            model_three_rmse$.estimate, model_four_rsq$.estimate, model_four_rmse$.estimate, best_rsq$.estimate, best_rmse$.estimate)
 r_values_df <- data.frame(model,stat,value)
