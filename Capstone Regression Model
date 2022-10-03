@@ -1,0 +1,167 @@
+#dataset url
+dataset_url <- "https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-RP0321EN-SkillsNetwork/labs/datasets/seoul_bike_sharing_converted_normalized.csv"
+bike_sharing_df <- read_csv(dataset_url)
+spec(bike_sharing_df)
+
+#remove date and functioning day columns
+bike_sharing_df <- bike_sharing_df %>% 
+  select(-DATE, -FUNCTIONING_DAY)
+head(bike_sharing_df)
+
+#regression model specification
+lm_spec <- linear_reg() %>%
+  set_engine("lm") %>% 
+  set_mode("regression")
+
+#split data into training and testing dataset
+set.seed(1234)
+data_split <- initial_split(bike_sharing_df, prop = 4/5)
+train_data <- training(data_split)
+test_data <- testing(data_split)
+
+#graph of rented bike count vs temp does not show linear corelation
+ggplot(data = train_data, aes(RENTED_BIKE_COUNT, TEMPERATURE)) + 
+  geom_point() 
+
+#plot of higher polynomial fits
+ggplot(data=train_data, aes(RENTED_BIKE_COUNT, TEMPERATURE)) + 
+  geom_point() + 
+  geom_smooth(method = "lm", formula = y ~ x, color="red") + 
+  geom_smooth(method = "lm", formula = y ~ poly(x, 2), color="yellow") + 
+  geom_smooth(method = "lm", formula = y ~ poly(x, 4), color="green") + 
+  geom_smooth(method = "lm", formula = y ~ poly(x, 6), color="blue")
+
+#linear regression with higher order polynomials
+lm_poly <- lm_spec %>% fit(RENTED_BIKE_COUNT ~ poly(RAINFALL, 8) + poly(HUMIDITY, 5) +  poly(TEMPERATURE, 5) + poly(DEW_POINT_TEMPERATURE, 5) + poly(SOLAR_RADIATION, 5) + poly(SNOWFALL,5) + SPRING + 
+                             SUMMER + AUTUMN + HOLIDAY + WIND_SPEED + VISIBILITY + `18` + `19` + `8` + `21` + `20` + `4` + `5` + `22` + `3` + `17` + `11` + `10` + `2` + `12` + `6` + `14` + `13` + `1` + `15` +
+                             `7` + `23` + `0` + `16`, data = train_data)
+summary(lm_poly$fit)
+
+# test linear regression 
+test_results <- lm_poly %>%
+  # Make the predictions and save the predicted values
+  predict(new_data = test_data) %>%
+  # Create a new column to save the true values
+  mutate(truth = test_data$RENTED_BIKE_COUNT)
+
+head(test_results)
+
+#convert all negative predictions to zero
+test_results[test_results<0] <- 0
+
+#calculate r squared and rmse for regression model
+test_results_rsq <- rsq(test_results, truth = truth, estimate = .pred)
+test_results_rmse <- rmse(test_results, truth = truth, estimate = .pred)
+
+test_results_rsq
+test_results_rmse
+
+#add interaction values to the regression model
+lm_interactions <- lm_spec %>% fit(RENTED_BIKE_COUNT ~ RAINFALL*HUMIDITY*TEMPERATURE + SPRING*SUMMER*AUTUMN*HOLIDAY*`18`*`19`*`8`*`21`*`20`*`4` + poly(RAINFALL, 8) + poly(HUMIDITY, 5) +  poly(TEMPERATURE, 5) + poly(DEW_POINT_TEMPERATURE, 5) + poly(SOLAR_RADIATION, 5) + poly(SNOWFALL,5) + SPRING + 
+                                     SUMMER + AUTUMN + HOLIDAY + WIND_SPEED + VISIBILITY + `18` + `19` + `8` + `21` + `20` + `4` + `5` + `22` + `3` + `17` + `11` + `10` + `2` + `12` + `6` + `14` + `13` + `1` + `15` +
+                                     `7` + `23` + `0` + `16`, data = train_data)
+summary(lm_interactions)$coefficients
+
+#test linear regression with interactions and get rmse and r squared values
+int_test_results <- lm_interactions %>%
+  predict(new_data = test_data) %>%
+  mutate(truth = test_data$RENTED_BIKE_COUNT)
+
+head(int_test_results)
+
+int_test_results[int_test_results<0] <- 0
+
+int_test_results_rsq <- rsq(int_test_results, truth = truth, estimate = .pred)
+int_test_results_rmse <- rmse(int_test_results, truth = truth, estimate = .pred)
+
+int_test_results_rsq
+int_test_results_rmse
+
+#add regularization to linear model with interactions and polynomials
+
+#prediction function
+model_prediction <- function(lm_model, test_data) {
+  reg_test_results <- lm_model %>%
+    predict(new_data = test_data) %>%
+    mutate(truth=test_data$RENTED_BIKE_COUNT)
+  reg_test_results[reg_test_results<0] <- 0
+  return(reg_test_results)
+}
+
+#model evaluation function
+model_evaluation <- function(reg_test_results) {
+  rmse <- rmse(reg_test_results, truth = truth, estimate = .pred)
+  r2 <- rsq(reg_test_results, truth = truth, estimate = .pred)
+  print(r2)
+  print(rmse)
+}
+
+glmnet_spec <- linear_reg(penalty = 0.1, mixture = 0.3) %>%
+  set_engine("glmnet") %>%
+  set_mode("regression")
+
+reg_recipe <- glmnet_spec %>% fit(RENTED_BIKE_COUNT ~ RAINFALL*HUMIDITY*TEMPERATURE + SPRING*SUMMER*AUTUMN*HOLIDAY*`18`*`19`*`8`*`21`*`20`*`4` + poly(RAINFALL, 8) + poly(HUMIDITY, 5) +  poly(TEMPERATURE, 5) + poly(DEW_POINT_TEMPERATURE, 5) + poly(SOLAR_RADIATION, 5) + poly(SNOWFALL,5) + SPRING + 
+                                    SUMMER + AUTUMN + HOLIDAY + WIND_SPEED + VISIBILITY + `18` + `19` + `8` + `21` + `20` + `4` + `5` + `22` + `3` + `17` + `11` + `10` + `2` + `12` + `6` + `14` + `13` + `1` + `15` +
+                                    `7` + `23` + `0` + `16`, data = train_data)
+
+test_results_lasso <- model_prediction(reg_recipe, test_data)
+model_evaluation(test_results_lasso)
+
+
+#MAKE FIVE MODELS WITH Q-Q PLOT
+
+best_model <- test_results_lasso
+best_rmse <- rmse(test_results_lasso, truth = truth, estimate = .pred)
+best_rsq <- rsq(test_results_lasso, truth = truth, estimate = .pred)
+
+#base model
+base_recipe <- glmnet_spec %>% fit(RENTED_BIKE_COUNT ~ RAINFALL+HUMIDITY+TEMPERATURE+DEW_POINT_TEMPERATURE+
+                                     `19`+ `8` + `21` + `20` + `4` + `5` + AUTUMN + `22` + `3` + `17` +
+                                     SOLAR_RADIATION + SNOWFALL + `11` + `10` + `2` + `12` + `6` + SUMMER +
+                                     `14` + SPRING + `13` + HOLIDAY + `1` + `15` + `7` + `23` + WIND_SPEED + 
+                                     `0` + `16` + VISIBILITY, data = train_data)
+base_model <- model_prediction(base_recipe, test_data)
+model_evaluation(base_model)
+base_rmse <- rmse(base_model, truth = truth, estimate = .pred)
+base_rsq <- rsq(base_model, truth = truth, estimate = .pred)
+
+#model 2 - top 10 coefficients
+model_two_recipe <- glmnet_spec %>% fit(RENTED_BIKE_COUNT ~ RAINFALL*HUMIDITY*TEMPERATURE + poly(RAINFALL, 8) + poly(HUMIDITY, 5) + 
+                                   `18`*`19`*`8`*`21`*`20`*`4` + poly(TEMPERATURE, 5) + poly(DEW_POINT_TEMPERATURE, 5) + `19` + `8` + 
+                                     `21` + `20` + `4`, data = train_data)
+model_two <- model_prediction(model_two_recipe, test_data)
+model_evaluation(model_two)
+model_two_rmse <- rmse(model_two, truth = truth, estimate = .pred)
+model_two_rsq <- rsq(model_two, truth = truth, estimate = .pred)
+
+#model 3 - top 15 coefficients
+model_three_recipe <- glmnet_spec %>% fit(RENTED_BIKE_COUNT ~ RAINFALL*HUMIDITY*TEMPERATURE + poly(RAINFALL, 8) + poly(HUMIDITY, 5) + 
+                                            `18`*`19`*`8`*`21`*`20`*`4`*`5`*`22`*`3`*`17` + poly(TEMPERATURE, 5) + poly(DEW_POINT_TEMPERATURE, 5) + `19` + `8` + 
+                                            `21` + `20` + `4` + `5` + `22` + `3` + `17` + AUTUMN, data = train_data)
+model_three <- model_prediction(model_three_recipe, test_data)
+model_evaluation(model_three)
+model_three_rmse <- rmse(model_three, truth = truth, estimate = .pred)
+model_three_rsq <- rsq(model_three, truth = truth, estimate = .pred)
+
+#model 4 - only 7 most relevant hours
+model_four_recipe <- glmnet_spec %>% fit(RENTED_BIKE_COUNT ~ RAINFALL*HUMIDITY*TEMPERATURE  + `18`*`19`*`8`*`21`*`20`*`4`*`5`*SPRING*SUMMER*AUTUMN*HOLIDAY + 
+                                           poly(RAINFALL, 8) + poly(HUMIDITY, 5) + poly(TEMPERATURE, 5) + poly(DEW_POINT_TEMPERATURE, 5) + poly(SOLAR_RADIATION, 5) + 
+                                           poly(SNOWFALL, 5) + SPRING  + AUTUMN + SUMMER + HOLIDAY + `18` + `19` + `8` + `21` + `20` + `4` + `5` + WIND_SPEED +
+                                           VISIBILITY, data = train_data)
+model_four <- model_prediction(model_four_recipe, test_data)
+model_evaluation(model_four)
+model_four_rmse <- rmse(model_four, truth = truth, estimate = .pred)
+model_four_rsq <- rsq(model_four, truth = truth, estimate = .pred)
+
+#create dataframe
+model <- c(rep("Base Model", 2), rep("Model 2", 2), rep("Model 3", 2), rep("Model 4", 2), rep("Best Model", 2))
+stat <- rep(c("RMSE" , "RSQ") , 5)
+value <- c(base_rsq$.estimate, base_rmse$.estimate, model_two_rsq$.estimate, model_two_rmse$.estimate, model_three_rsq$.estimate,
+           model_three_rmse$.estimate, model_four_rsq$.estimate, model_four_rmse$.estimate, best_rsq$.estimate, best_rmse$.estimate)
+r_values_df <- data.frame(model,stat,value)
+print(r_values_df)
+
+#grouped chart of rsq and rmse
+
+ggplot(r_values_df, aes(fill = stat, y = value, x = model)) + 
+  geom_bar(position="dodge", stat="identity")
