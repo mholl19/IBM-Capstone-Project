@@ -58,10 +58,14 @@ shinyServer(function(input, output){
       output$city_bike_map <- renderLeaflet({
         leaflet(filteredcity) %>%
           addTiles() %>%
+          addPopups(data = filteredcity,
+                    lng = filteredcity$LNG,
+                    lat = filteredcity$LAT,
+                    popup = filteredcity$DETAILED_LABEL,
+                    options = popupOptions(noHide = T)) %>%
           addCircleMarkers(data = filteredcity,
                            lng = filteredcity$LNG,
-                           lat = filteredcity$LAT,
-                           popup = filteredcity$DETAILED_LABEL,
+                           lat = filteredcity$LAT, 
                            radius = ~ifelse(filteredcity$BIKE_PREDICTION_LEVEL == 'small', 6, 12),
                            color = ~color_levels(filteredcity$BIKE_PREDICTION_LEVEL))
           
@@ -82,18 +86,28 @@ shinyServer(function(input, output){
       })
       #bike prediction plot
       output$bike_line <- renderPlot ({
-        bike_line_plot <- ggplot(sel_city_weather_bike_df, aes(x=1:length(BIKE_PREDICTION), y=BIKE_PREDICTION)) +
-          geom_line(color = "green", size = 1, linetype = "dashed") +
+        bike_line_plot <- ggplot(sel_city_weather_bike_df, aes(x = as.POSIXct(FORECASTDATETIME, format = "%Y-%m-%d %H:%M:%S"), y=BIKE_PREDICTION)) +
+          scale_x_datetime(date_labels = "%m-%d-%y") +
+          geom_line(color = "darkcyan", size = 1, linetype = "dashed") +
           labs(x = "Time (3 hours ahead)", y= "Predicted Bike Count") +
           geom_point() +
           geom_text(aes(label = paste(BIKE_PREDICTION)), hjust = 0, vjust = 0) +
-          ggtitle("Bike Prediction Trend")
+          ggtitle("Bike Prediction Trends")
         bike_line_plot
       })
-      #text output of bike count point START HERE
+      #text output of bike count point 
       output$bike_date_output <- renderText({
-        paste0("Time: ", as.POSIXct(as.integer(input$plot_click$x), origin = "1970-01-01"),
+        paste("Time:", as.POSIXct(as.integer(input$plot_click$x), origin = "1970-01-01"),
                "\nBike Count Prediction: ", as.integer(input$plot_click$y))
+      })
+      #humidity prediction plot
+      output$humidity_pred_chart <- renderPlot ({
+        humid_line_plot <- ggplot(sel_city_weather_bike_df, aes(x = HUMIDITY, y = BIKE_PREDICTION)) +
+          labs(x = "Humidity", y = "Predicted Bike Count") +
+          geom_point() +
+          geom_smooth(method = lm, formula = y ~ poly(x,4), color = "red") +
+          ggtitle("Bike Prediction Based on Humidity")
+      humid_line_plot
       })
     } 
   })
