@@ -2,6 +2,7 @@ library("rlang")
 library("tidymodels")
 library("tidyverse")
 library("stringr")
+library("RColorBrewer")
 
 #dataset url
 dataset_url <- "https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMDeveloperSkillsNetwork-RP0321EN-SkillsNetwork/labs/datasets/seoul_bike_sharing_converted_normalized.csv"
@@ -154,19 +155,34 @@ model_four_recipe <- glmnet_spec %>% fit(RENTED_BIKE_COUNT ~ RAINFALL*HUMIDITY*T
                                            poly(SNOWFALL, 5) + SPRING  + AUTUMN + SUMMER + HOLIDAY + `18` + `19` + `8` + `21` + `20` + `4` + `5` + WIND_SPEED +
                                            VISIBILITY, data = train_data)
 model_four <- model_prediction(model_four_recipe, test_data)
+model_four
 model_evaluation(model_four)
 model_four_rmse <- rmse(model_four, truth = truth, estimate = .pred)
 model_four_rsq <- rsq(model_four, truth = truth, estimate = .pred)
 
 #create dataframe
-model <- c(rep("Base Model", 2), rep("Model 2", 2), rep("Model 3", 2), rep("Model 4", 2), rep("Best Model", 2))
-stat <- rep(c("RSQ" , "RMSE") , 5)
-value <- c(base_rsq$.estimate, base_rmse$.estimate, model_two_rsq$.estimate, model_two_rmse$.estimate, model_three_rsq$.estimate,
-           model_three_rmse$.estimate, model_four_rsq$.estimate, model_four_rmse$.estimate, best_rsq$.estimate, best_rmse$.estimate)
-r_values_df <- data.frame(model,stat,value)
+r_values_df <- data.frame(Model = c("Model 1", "Model 2", "Model 3", "Model 4", "Model 5"),
+                          RSQ = c(base_rsq$.estimate, model_two_rsq$.estimate, model_three_rsq$.estimate, model_four_rsq$.estimate, best_rsq$.estimate),
+                          RMSE = c(base_rmse$.estimate, model_two_rmse$.estimate, model_three_rmse$.estimate, model_four_rmse$.estimate, best_rmse$.estimate))
 print(r_values_df)
 
 #grouped chart of rsq and rmse
 
-ggplot(r_values_df, aes(fill = stat, y = value, x = model)) + 
-  geom_bar(position="dodge", stat="identity")
+ggplot(data = r_values_df, aes(x=Model, y=RSQ , fill = Model)) +
+  geom_bar(stat="identity")+
+  geom_text(aes(label= format(round(RSQ, 3), nsmall = 3))  , vjust=-0.3, size=3.5)+
+  theme_minimal() +
+  scale_fill_brewer(palette = "BuPu")
+
+ggplot(data = r_values_df, aes(x=Model, y=RMSE , fill = Model)) +
+  geom_bar(stat="identity")+
+  geom_text(aes(label= format(round(RMSE, 0), nsmall = 0))  , vjust=-0.3, size=3.5)+
+  theme_minimal() +
+  scale_fill_brewer(palette = "BuPu")
+
+#qq plot of best model
+
+ggplot(data = best_model) +
+  stat_qq(aes(sample=truth), color='green') +
+  stat_qq(aes(sample=.pred), color='red') +
+  theme_minimal()
